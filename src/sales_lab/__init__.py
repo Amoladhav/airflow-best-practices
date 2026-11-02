@@ -1,0 +1,1 @@
+"""Sales pipeline business logic."""
