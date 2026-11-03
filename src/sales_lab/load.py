@@ -2,6 +2,7 @@
 
 import sqlite3
 from collections.abc import Sequence
+from importlib.resources import files
 from pathlib import Path
 
 from sales_lab.transform import Sale
@@ -10,8 +11,7 @@ from sales_lab.transform import Sale
 def load_sales(
         db_path: Path,
         sales: Sequence[Sale],
-        sql_dir: Path,
-) -> None:
+        ) -> None:
     """Load an already validated batch in one transaction..
 
     Create the sales table if necessary.
@@ -19,9 +19,10 @@ def load_sales(
     Own and close the database connection.
     """
 
+    sql_resources = files("sales_lab").joinpath("sql")
 
-    schema_sql = (sql_dir / "schema.sql").read_text(encoding="utf-8")
-    upsert_sql = (sql_dir / "upsert_sales.sql").read_text(encoding="utf-8")
+    schema_sql = (sql_resources / "schema.sql").read_text(encoding="utf-8")
+    upsert_sql = (sql_resources / "upsert_sales.sql").read_text(encoding="utf-8")
 
     parameters = [
         {

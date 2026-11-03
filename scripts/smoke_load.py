@@ -23,7 +23,6 @@ def main() -> None:
         load_sales(
             db_path=db_path,
             sales=sales,
-            sql_dir=project_root / "sql"
         )
 
         with closing(sqlite3.connect(db_path)) as connection:

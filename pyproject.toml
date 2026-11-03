@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airflow-sales-lab"
+version = "0.1.0"
+description = "Sales pipeline buisiness logic for an Airflow lab"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sales_lab"]
+namespaces = false
+
+[tool.setuptools.package-data]
+sales_lab = ["sql/*.sql"]

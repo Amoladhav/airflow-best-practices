@@ -37,7 +37,7 @@ class LoadSalesTest(unittest.TestCase):
             ).fetchall()
 
     def test_initial_load_stored_expected_rows(self) -> None:
-        load_sales(self.db_path, self.sales, SQL_DIR)
+        load_sales(self.db_path, self.sales)
 
         self.assertEqual(
             self.stored_rows(),
@@ -49,16 +49,16 @@ class LoadSalesTest(unittest.TestCase):
         )
 
     def test_identical_replay_leaves_contents_unchanged(self) -> None:
-        load_sales(self.db_path, self.sales, SQL_DIR)
+        load_sales(self.db_path, self.sales)
         before = self.stored_rows()
 
-        load_sales(self.db_path, self.sales, SQL_DIR)
+        load_sales(self.db_path, self.sales)
         self.assertEqual(self.stored_rows(), before)
         self.assertEqual(len(self.stored_rows()), len(before))
 
 
     def test_failed_batch_rolls_back_and_allows_recovery(self) -> None:
-        load_sales(self.db_path, self.sales, SQL_DIR)
+        load_sales(self.db_path, self.sales)
         before = self.stored_rows()
 
         with closing(
@@ -84,7 +84,6 @@ class LoadSalesTest(unittest.TestCase):
                 load_sales(
                     self.db_path,
                     [updated_sales, new_sale, rejected_sale],
-                    SQL_DIR,
                 )
 
             self.assertEqual(self.stored_rows(), before)
@@ -93,7 +92,6 @@ class LoadSalesTest(unittest.TestCase):
             load_sales(
                 self.db_path,
                 [updated_sales, new_sale],
-                SQL_DIR,
             )
 
             self.assertEqual(
@@ -106,7 +104,7 @@ class LoadSalesTest(unittest.TestCase):
             )
 
     def test_existing_id_updates_without_duplicating(self) -> None:
-        load_sales(self.db_path, self.sales, SQL_DIR)
+        load_sales(self.db_path, self.sales)
 
         updated_sale = replace(
             self.sales[0],
@@ -115,7 +113,7 @@ class LoadSalesTest(unittest.TestCase):
             amount_cents=2500,
             )
 
-        load_sales(self.db_path, [updated_sale], SQL_DIR)
+        load_sales(self.db_path, [updated_sale])
 
         self.assertEqual(
             self.stored_rows(),
