@@ -1,0 +1,11 @@
+# Include only the files needed to build the application image.
+**
+!Dockerfile
+!pyproject.toml
+!src/
+!src/**
+
+# Exclude generated Python artifacts within src.
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
