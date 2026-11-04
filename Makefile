@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: check-fast lint format-check test format
+.PHONY: check-fast lint format-check test format fix
 
 check-fast:
 	$(MAKE) lint
@@ -18,3 +18,6 @@ test:
 
 format:
 	$(PYTHON) -m ruff format .
+
+fix:
+	$(PYTHON) -m ruff check . --fix
