@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: check-fast lint format-check test format fix
+.PHONY: check-fast lint format-check test format fix airflow-init airflow-smoke
 
 check-fast:
 	$(MAKE) lint
@@ -21,3 +21,9 @@ format:
 
 fix:
 	$(PYTHON) -m ruff check . --fix
+
+airflow-init:
+	docker compose run --rm airflow-smoke airflow db migrate
+
+airflow-smoke:
+	docker compose run --rm airflow-smoke airflow dags test sales_etl
