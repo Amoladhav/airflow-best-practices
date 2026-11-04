@@ -22,11 +22,10 @@ class LoadSalesTest(unittest.TestCase):
 
         self.sales = [
             Sale(1, date(2026, 10, 1), "C001", 1995),
-            Sale(2, date(2026, 10, 2), "C002", 0)
+            Sale(2, date(2026, 10, 2), "C002", 0),
         ]
 
-
-    def stored_rows(self) -> list[tuple[int,str,str,int]]:
+    def stored_rows(self) -> list[tuple[int, str, str, int]]:
         with closing(sqlite3.connect(self.db_path)) as connection:
             return connection.execute(
                 """
@@ -41,11 +40,7 @@ class LoadSalesTest(unittest.TestCase):
 
         self.assertEqual(
             self.stored_rows(),
-            [
-                (1, "2026-10-01", "C001", 1995),
-                (2, "2026-10-02", "C002", 0)
-                ],
-
+            [(1, "2026-10-01", "C001", 1995), (2, "2026-10-02", "C002", 0)],
         )
 
     def test_identical_replay_leaves_contents_unchanged(self) -> None:
@@ -56,14 +51,11 @@ class LoadSalesTest(unittest.TestCase):
         self.assertEqual(self.stored_rows(), before)
         self.assertEqual(len(self.stored_rows()), len(before))
 
-
     def test_failed_batch_rolls_back_and_allows_recovery(self) -> None:
         load_sales(self.db_path, self.sales)
         before = self.stored_rows()
 
-        with closing(
-            sqlite3.connect(self.db_path, isolation_level=None)
-        ) as connection:
+        with closing(sqlite3.connect(self.db_path, isolation_level=None)) as connection:
             connection.execute(
                 """
                 CREATE TRIGGER reject_sales_three
@@ -88,7 +80,7 @@ class LoadSalesTest(unittest.TestCase):
 
             self.assertEqual(self.stored_rows(), before)
 
-            #A subsequent valid batch must still succeed.
+            # A subsequent valid batch must still succeed.
             load_sales(
                 self.db_path,
                 [updated_sales, new_sale],
@@ -99,7 +91,7 @@ class LoadSalesTest(unittest.TestCase):
                 [
                     (1, "2026-10-01", "C001", 2500),
                     (2, "2026-10-02", "C002", 0),
-                    (4, "2026-10-03", "C004", 500)
+                    (4, "2026-10-03", "C004", 500),
                 ],
             )
 
@@ -111,14 +103,11 @@ class LoadSalesTest(unittest.TestCase):
             sale_date=date(2026, 10, 3),
             customer_id="C009",
             amount_cents=2500,
-            )
+        )
 
         load_sales(self.db_path, [updated_sale])
 
         self.assertEqual(
             self.stored_rows(),
-            [
-                (1, "2026-10-03", "C009", 2500),
-                (2, "2026-10-02", "C002", 0)
-            ]
+            [(1, "2026-10-03", "C009", 2500), (2, "2026-10-02", "C002", 0)],
         )

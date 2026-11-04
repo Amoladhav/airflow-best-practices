@@ -8,12 +8,12 @@ from tempfile import TemporaryDirectory
 from sales_lab.ingest import read_sales_csv
 from sales_lab.load import load_sales
 
+
 def main() -> None:
     project_root = Path(__file__).resolve().parents[1]
 
     with (project_root / "sample_data" / "sales.csv").open(
-        encoding="utf-8",
-        newline=""
+        encoding="utf-8", newline=""
     ) as stream:
         sales = read_sales_csv(stream)
 
@@ -37,6 +37,7 @@ def main() -> None:
 
         for row in rows:
             print(row)
+
 
 if __name__ == "__main__":
     main()

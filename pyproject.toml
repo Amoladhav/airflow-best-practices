@@ -16,3 +16,20 @@ namespaces = false
 
 [tool.setuptools.package-data]
 sales_lab = ["sql/*.sql"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "ruff==0.17.3",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+filterwarnings = ["error::DeprecationWarning"]

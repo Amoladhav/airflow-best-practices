@@ -9,9 +9,9 @@ from sales_lab.transform import Sale
 
 
 def load_sales(
-        db_path: Path,
-        sales: Sequence[Sale],
-        ) -> None:
+    db_path: Path,
+    sales: Sequence[Sale],
+) -> None:
     """Load an already validated batch in one transaction..
 
     Create the sales table if necessary.
@@ -29,7 +29,7 @@ def load_sales(
             "sale_id": sale.sale_id,
             "sale_date": sale.sale_date.isoformat(),
             "customer_id": sale.customer_id,
-            "amount_cents": sale.amount_cents
+            "amount_cents": sale.amount_cents,
         }
         for sale in sales
     ]

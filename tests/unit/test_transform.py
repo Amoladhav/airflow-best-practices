@@ -3,7 +3,7 @@
 import unittest
 from datetime import date
 
-from sales_lab.transform import Sale, transform_row, transform_batch
+from sales_lab.transform import Sale, transform_batch, transform_row
 
 
 def source_row(**changes: str) -> dict[str, str]:
@@ -38,9 +38,7 @@ class TransformRowTests(unittest.TestCase):
                 )
 
     def test_surrounding_whitespace_is_removed(self):
-        actual = transform_row(
-            source_row(customer_id=" C001 ", amount=" 19.95 ")
-        )
+        actual = transform_row(source_row(customer_id=" C001 ", amount=" 19.95 "))
         self.assertEqual(actual.customer_id, "C001")
         self.assertEqual(actual.amount_cents, 1995)
 
@@ -70,7 +68,6 @@ class TransformRowTests(unittest.TestCase):
         del row["amount"]
         with self.assertRaisesRegex(ValueError, "amount"):
             transform_row(row)
-
 
 
 class TransformBatchTests(unittest.TestCase):

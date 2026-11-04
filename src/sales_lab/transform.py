@@ -1,4 +1,5 @@
 """Validate source records and normalize monetary amounts"""
+
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -48,7 +49,9 @@ def transform_row(row: Mapping[str, str]) -> Sale:
 
     raw_amount = fields["amount"]
     if not re.fullmatch(r"[0-9]{1,17}(?:\.[0-9]{1,2})?", raw_amount):
-        raise ValueError(f"{raw_amount}: amount expected a non-negative number with atmost two decimal places")
+        raise ValueError(
+            f"{raw_amount}: amount expected a non-negative number with atmost two decimal places"
+        )
     try:
         amount_cents = int(Decimal(raw_amount) * 100)
     except ArithmeticError as exc:
