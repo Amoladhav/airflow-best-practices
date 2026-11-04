@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: check-fast lint format-check test format fix airflow-init airflow-smoke
+.PHONY: check-fast lint format-check test format fix airflow-init airflow-smoke airflow-inspect
 
 check-fast:
 	$(MAKE) lint
@@ -27,3 +27,6 @@ airflow-init:
 
 airflow-smoke:
 	docker compose run --rm airflow-smoke airflow dags test sales_etl
+
+airflow-inspect:
+	docker compose run --rm airflow-smoke python /opt/airflow/scripts/inspect_sales.py

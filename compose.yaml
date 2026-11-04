@@ -14,5 +14,6 @@ services:
       - airflow-state:/opt/airflow
       - ./dags:/opt/airflow/dags:ro
       - ./sample_data:/opt/airflow/sample_data:ro
+      - ./scripts:/opt/airflow/scripts:ro
 volumes:
   airflow-state:
