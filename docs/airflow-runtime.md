@@ -311,11 +311,14 @@ Owner-run acceptance established:
 The test fixture intentionally remains different after this isolation exercise.
 The run IDs above are historical evidence, not IDs to reuse in future commands.
 
-### Remaining acceptance limits
+Development's configuration was subsequently applied with `up -d`. A temporary
+marker in `data/dev/input` was visible inside its scheduler, verifying the input
+mapping despite Docker Desktop's translated WSL source path. Mount inspection
+confirmed read-only access. A fresh-container inspection then returned all eight
+original sales rows, including sale 1 at `1995` cents. No DAG replay was repeated
+for this mount change; the historical scheduler runs used the original input mount.
 
-Development's running services have not yet been recreated with the new
-`data/dev/input` mount. Its successful historical runs used the original
-`sample_data` mount; its persisted data was checked after the test-only update.
+### Remaining acceptance limits
 
 Environment code-SHA recording, separate release directories, automated CI/CD
 and promotion remain pending. All runtimes currently share live repository DAGs
