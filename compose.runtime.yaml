@@ -1,0 +1,108 @@
+# Project name comes from COMPOSE_PROJECT_NAME in the selected environment file.
+
+x-airflow-common: &airflow-common
+  # Define an &airflow-common YAML anchor.
+  # Reuse the existing application image and build context.
+  # Share Airflow configuration and mounts between Airflow services.
+    image: airflow-sales-lab:afl105
+    build: .
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - SALES_CSV_PATH=/opt/airflow/sample_data/sales.csv
+      - APP_ENV=${APP_ENV:?APP_ENV is required}
+      - SALES_DB_PATH=/opt/airflow/sales-data/sales.db
+      - AIRFLOW__CORE__EXECUTION_API_SERVER_URL=http://airflow-api-server:8080/execution/
+      - AIRFLOW__API_AUTH__JWT_SECRET=${AIRFLOW_JWT_SECRET:?AIRFLOW_JWT_SECRET is required}
+    volumes:
+      - sales-data:/opt/airflow/sales-data
+      - airflow-logs:/opt/airflow/logs
+      - ./dags:/opt/airflow/dags:ro
+      - ./sample_data:/opt/airflow/sample_data:ro
+      - ./scripts:/opt/airflow/scripts:ro
+
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
+
+  airflow-volume-init:
+    image: airflow-sales-lab:afl105
+    user: "0:0"
+    command:
+      - bash
+      - -c
+      - |
+        set -e
+        chown airflow:root /opt/airflow/sales-data /opt/airflow/logs
+        chmod 2775 /opt/airflow/sales-data /opt/airflow/logs
+    volumes:
+      - sales-data:/opt/airflow/sales-data
+      - airflow-logs:/opt/airflow/logs
+    restart: "no"
+
+  airflow-init:
+    <<: *airflow-common
+    command: ["airflow", "db", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-volume-init:
+        condition: service_completed_successfully
+    restart: "no"
+
+
+  airflow-api-server:
+    <<: *airflow-common
+    command: ["airflow", "api-server"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${AIRFLOW_PORT:?AIRFLOW_PORT is required}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail",
+      "http://localhost:8080/api/v2/monitor/health"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: ["airflow", "scheduler"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-api-server:
+        condition: service_healthy
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: ["airflow", "dag-processor"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+
+volumes:
+  postgres-data:
+    # Airflow metadata only.
+  sales-data:
+    # Sales SQLite output only.
+  airflow-logs:
+    # Task logs shared by the Airflow services.
