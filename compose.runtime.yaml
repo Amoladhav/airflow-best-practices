@@ -19,7 +19,7 @@ x-airflow-common: &airflow-common
       - sales-data:/opt/airflow/sales-data
       - airflow-logs:/opt/airflow/logs
       - ./dags:/opt/airflow/dags:ro
-      - ./sample_data:/opt/airflow/sample_data:ro
+      - ${SALES_INPUT_DIR:?SALES_INPUT_DIR is required}:/opt/airflow/sample_data:ro
       - ./scripts:/opt/airflow/scripts:ro
 
 
