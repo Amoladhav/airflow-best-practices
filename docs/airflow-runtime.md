@@ -10,6 +10,116 @@ metadata and sales output. The smoke instructions below apply to that file.
 `compose.runtime.yaml` defines the separate scheduler environments documented
 later in this guide.
 
+## Common scheduler commands
+
+Run from the repository root. `ENV` accepts `dev`, `test` or `prod` and defaults
+to `dev`. Each target selects that environment's existing public settings,
+secret file and explicit Compose project. Secret values are not printed by the
+configuration check. These commands do not bootstrap inputs or secrets.
+
+| Command | Purpose |
+|---|---|
+| `make help` | List common operations |
+| `make config ENV=dev` | Validate Compose configuration silently |
+| `make up ENV=dev` | Start services or apply configuration without rebuilding |
+| `make ps ENV=dev` | Show running and stopped containers |
+| `make logs ENV=dev` | Follow the scheduler's last 100 log lines and new output |
+| `make logs ENV=dev SERVICE=airflow-dag-processor` | Follow a different service |
+| `make shell ENV=dev` | Open bash in the running scheduler |
+| `make db-shell ENV=dev` | Open psql against Airflow's PostgreSQL metadata |
+| `make db-query ENV=dev SQL_FILE=path/to/query.sql` | Execute a local SQL file against metadata |
+| `make inspect ENV=dev` | Inspect the separate SQLite sales output |
+| `make stop ENV=dev` | Stop services, retaining containers and named volumes |
+| `make down ENV=dev` | Remove containers/network, retaining named volumes |
+| `make db-start ENV=dev` | Start the existing PostgreSQL container only; requires prior environment initialization |
+
+Use `stop` for an ordinary pause. `down` removes container-local files, including
+the generated SimpleAuthManager password file in the API container; its login
+may change when recreated. Named sales, metadata and log volumes remain intact.
+No target deletes volumes, resets databases, prunes Docker or overwrites inputs.
+Logs can contain operational details; inspect them locally before sharing.
+
+`shell` and `logs` accept `SERVICE`; its default is `airflow-scheduler`.
+`db-shell` and `db-query` require the selected environment's PostgreSQL service
+to be running. No host PostgreSQL installation or exposed database port is needed.
+
+### Query Airflow metadata
+
+PostgreSQL stores DAG/task execution metadata. Business sales rows are in SQLite,
+so use `make inspect` for the sales result rather than looking for a PostgreSQL
+`sales` table.
+
+Open the metadata console:
+
+```bash
+make db-shell ENV=dev
+```
+
+At the psql prompt, confirm the database:
+
+```sql
+SELECT current_database(), current_user;
+```
+
+Check the default transaction mode:
+
+```sql
+SHOW default_transaction_read_only;
+```
+
+List tables:
+
+```text
+\dt
+```
+
+Inspect the DAG-run schema before writing queries against it:
+
+```text
+\d dag_run
+```
+
+Summarize recorded execution states:
+
+```sql
+SELECT dag_id, state, COUNT(*) AS runs
+FROM dag_run
+GROUP BY dag_id, state
+ORDER BY dag_id, state;
+```
+
+Exit the console:
+
+```text
+\q
+```
+
+Both database targets set a read-only transaction default for that connection;
+they do not change Airflow's own connections. This is an accidental-write guard,
+not a restricted database role: the existing lab account can override it. Use
+Airflow's supported interfaces for changing execution state. `db-query` disables
+the TTY, reads the SQL file through stdin and fails on SQL errors. Both targets
+ignore psql startup files with `-X`.
+
+Wrapper validation: local checks with a stub Docker executable verified routing
+for all three environments, invalid-environment rejection, SQL-file stdin handling,
+missing-file rejection, service selection and command-failure propagation.
+
+Owner verified live dev metadata access on 2026-11-05: after starting the existing
+PostgreSQL container directly with Compose, `make db-shell ENV=dev` connected
+successfully. The query returned database `airflow`, user `airflow`, and
+`default_transaction_read_only=on`. The owner then invoked `make db-start ENV=dev`
+against the already-running container with no reported error, and verified
+`make db-query ENV=dev SQL_FILE=/tmp/airflow-metadata-check.sql` returned the same
+database, user and read-only setting. The wrapper's stopped-to-running transition
+was not separately exercised. Existing scheduler/data acceptance below remains
+separate historical runtime evidence.
+
+Implementation references: [Compose exec](https://docs.docker.com/reference/cli/docker/compose/exec/),
+[Compose down](https://docs.docker.com/reference/cli/docker/compose/down/),
+[PostgreSQL psql](https://www.postgresql.org/docs/16/app-psql.html) and
+[transaction defaults](https://www.postgresql.org/docs/16/runtime-config-client.html).
+
 ## Prerequisites and image
 
 Run commands from the repository root with Docker and Docker Compose
@@ -320,7 +430,7 @@ for this mount change; the historical scheduler runs used the original input mou
 
 ### Remaining acceptance limits
 
-Environment code-SHA recording, separate release directories, automated CI/CD
+Deployment identity recording, separate code releases, automated CI/CD
 and promotion remain pending. All runtimes currently share live repository DAGs
 and scripts and reuse `airflow-sales-lab:afl105`; the current Git HEAD alone does
 not identify the installed application image. The procedures above document
@@ -329,3 +439,7 @@ operation, not an automated deployment system.
 SQLite and shared local storage are lab choices. Distributed-worker behavior,
 production security and AWS compatibility have not been established. AWS
 selection and validation remain the final phase.
+
+The proposed [functional changes and code-backout scenarios](change-delivery-and-backout.md)
+describe future release acceptance, branch reconciliation and portability contracts.
+They are design documentation, not completed runtime evidence.
