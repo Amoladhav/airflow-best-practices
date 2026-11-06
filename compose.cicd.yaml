@@ -1,0 +1,46 @@
+name: airflow-cicd
+
+secrets:
+  runner-token:
+    file: ./.env.cicd.runner-token
+
+services:
+  gitea:
+    image: docker.gitea.com/gitea:28.3.0
+    restart: "no"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - gitea-data:/data
+    environment:
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__actions__ENABLED: "true"
+
+  runner:
+    image: gitea/runner:5.4.1-dind@sha256:8bcb489f9dd6be500de22bcaa8512ef57b81ae50315db8c7a1dc1b74978a76f4
+    profiles: ["ci"]
+    restart: "no"
+    stop_grace_period: 60s
+    privileged: true
+    depends_on:
+      - gitea
+    environment:
+      GITEA_INSTANCE_URL: "http://gitea:3000"
+      GITEA_RUNNER_NAME: airflow-lab-ci
+      GITEA_RUNNER_REGISTRATION_TOKEN_FILE: /run/secrets/runner-token
+      GITEA_MAX_REG_ATTEMPTS: "10"
+      CONFIG_FILE: /etc/gitea-runner/config.yaml
+    secrets:
+      - runner-token
+    volumes:
+      - runner-data:/data
+      - runner-docker:/var/lib/docker
+      - ./runner-config.yaml:/etc/gitea-runner/config.yaml:ro
+
+volumes:
+  gitea-data:
+    driver: local
+  runner-data:
+    driver: local
+  runner-docker:
+    driver: local

@@ -5,10 +5,29 @@ SERVICE ?= airflow-scheduler
 SQL_FILE ?=
 RUNTIME_COMPOSE = docker compose --project-name airflow-$(ENV) --env-file environments/$(ENV).env --env-file environments/.env.$(ENV).secrets -f compose.runtime.yaml
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
+CICD_COMPOSE = docker compose -f compose.cicd.yaml --profile ci
+.DEFAULT_GOAL := check-fast
 
 .PHONY: check-fast lint format-check test format fix airflow-init airflow-smoke airflow-inspect
 .PHONY: help runtime-check config up stop down ps logs shell db-shell db-start db-query inspect
 .PHONY: lint-docker
+.PHONY: cicd-start cicd-status cicd-stop cicd-down
+
+cicd-start:
+	@test -s .env.cicd.runner-token || { echo 'Missing runner token file'; exit 1; }
+	$(CICD_COMPOSE) config --quiet
+	$(CICD_COMPOSE) up -d
+
+cicd-status:
+	$(CICD_COMPOSE) ps -a
+
+cicd-stop:
+	$(CICD_COMPOSE) stop runner
+	$(CICD_COMPOSE) stop gitea
+	$(CICD_COMPOSE) ps -a
+
+cicd-down:
+	$(CICD_COMPOSE) down
 
 
 check-fast:
