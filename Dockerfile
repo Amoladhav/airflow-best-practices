@@ -5,3 +5,10 @@ COPY --chown=airflow:root src/ /tmp/sales-lab/src/
 
 RUN pip install --no-cache-dir --no-deps /tmp/sales-lab \
     && pip check
+
+
+COPY --chown=airflow:root dags/ /opt/airflow/dags/
+COPY --chown=airflow:root scripts/ /opt/airflow/scripts/
+
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"

@@ -4,8 +4,7 @@ x-airflow-common: &airflow-common
   # Define an &airflow-common YAML anchor.
   # Reuse the existing application image and build context.
   # Share Airflow configuration and mounts between Airflow services.
-    image: airflow-sales-lab:afl105
-    build: .
+    image: ${AIRFLOW_IMAGE:?AIRFLOW_IMAGE must identify the release}
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
@@ -18,9 +17,7 @@ x-airflow-common: &airflow-common
     volumes:
       - sales-data:/opt/airflow/sales-data
       - airflow-logs:/opt/airflow/logs
-      - ./dags:/opt/airflow/dags:ro
       - ${SALES_INPUT_DIR:?SALES_INPUT_DIR is required}:/opt/airflow/sample_data:ro
-      - ./scripts:/opt/airflow/scripts:ro
 
 
 services:
@@ -40,7 +37,7 @@ services:
       timeout: 5s
 
   airflow-volume-init:
-    image: airflow-sales-lab:afl105
+    image: ${AIRFLOW_IMAGE:?AIRFLOW_IMAGE must identify the release}
     user: "0:0"
     command:
       - bash

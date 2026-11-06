@@ -4,6 +4,10 @@
 !pyproject.toml
 !src/
 !src/**
+!dags/
+!dags/**
+!scripts/
+!scripts/**
 
 # Exclude generated Python artifacts within src.
 **/__pycache__/
