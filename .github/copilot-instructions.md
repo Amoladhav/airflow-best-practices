@@ -1,70 +1,27 @@
-# Project guidance
+# Data Engineering Stack Guidelines
 
-This repository demonstrates an Airflow sales pipeline with reproducible
-quality gates, idempotent loading, environment isolation, and deployment
-promotion. Local execution comes first; AWS validation is the final phase.
+## General Principles
+- **Idempotency & Safety:** Write deterministic code that handles retries cleanly. Never hardcode secrets, credentials, or connection strings; always use the environment's secret manager or configuration bindings.
+- **Modularity:** Keep orchestration, transformation logic, compute execution, and infrastructure cleanly separated.
 
-## Assistance style
+---
 
-- Work on the requested function or increment; do not implement unrelated files.
-- The developer owns implementation and learning. Explain consequential
-  design decisions and provide focused suggestions.
-- Follow existing code and tests. Identify conflicting requirements explicitly.
-- Prefer simple, readable solutions over frameworks or speculative abstractions.
-- Never claim tests or deployments passed without execution evidence.
+## Stack-Specific Standards
 
-## Architecture
+### 1. Orchestration (Airflow)
+- **TaskFlow Paradigm:** Prefer native task decorators (`@dag`, `@task`, `@task_group`) over legacy operator-heavy definitions.
+- **Data Passing:** Pass small payloads or references via context/XComs; store large datasets or intermediate states in object storage or data lakes, not inline execution memory.
+- **Top-Level Code:** Keep DAG parsing files free of heavy computation, database connections, or external API calls during import time.
 
-- Keep business logic in src/sales_lab and orchestration in dags.
-- Keep validation and transformation independent of Airflow and storage.
-- Perform I/O at explicit boundaries, not during module import.
-- Inject environment-specific paths and settings.
-- Do not assume separate Airflow tasks share a worker filesystem.
-- Pass small identifiers or durable storage references through XCom.
-- Treat SQLite as the local storage adapter, not an assumed AWS database.
-- Keep Spark separate from the Airflow process and DAG parsing.
+### 2. Transformation & Modeling (dbt)
+- **Layered Architecture:** Structure models cleanly through staged (`stg_`), intermediate (`int_`), and final fact/dimension mart (`fct_`, `dim_`) layers.
+- **Dependency Graph:** Always use standard referencing functions (`ref` and `source`) to build automated lineage DAGs.
 
-## Python and data contracts
+### 3. Compute & Data Processing (Spark / SQL)
+- **Optimized Execution:** Avoid collecting or materializing large distributed datasets to driver memory (avoid excessive `.collect()` or dataframe-to-local conversions).
+- **Format Standards:** Leverage columnar and transactional table formats (e.g., Delta) for persistence, schema enforcement, and atomic upserts.
+- **SQL Convention:** Write SQL keywords in uppercase (`SELECT`, `FROM`, `WHERE`, `JOIN`) and maintain clean table aliasing. Use `WHERE` clause by default to limit scope.
 
-- Use type annotations for function inputs and return values.
-- Use immutable typed records where they clarify a data contract.
-- Use Decimal for monetary parsing and integer cents for stored amounts.
-- Reject invalid input explicitly; never silently round, discard, or repair it.
-- Require positive sale IDs, valid YYYY-MM-DD dates, nonempty customer IDs,
-  and nonnegative amounts with at most two decimal places.
-- Reject duplicate sale IDs within a batch.
-- Validate the whole batch before writing.
-- Use meaningful exceptions with field or row context; avoid logging raw records.
-- Catch specific exceptions and preserve their causes.
-- Keep comments focused on intent, constraints, and non-obvious decisions.
-
-## SQL and reliability
-
-- Parameterize values; never interpolate input into SQL.
-- Keep SQL statements in sql/.
-- Load each batch transactionally.
-- Replaying identical input must leave the stored result unchanged.
-- Changed values for an existing sale ID must update that record.
-- Test rollback and recovery as well as successful execution.
-- Do not imply that UPSERT alone guarantees every form of idempotency.
-
-## Airflow
-
-- Use the public airflow.sdk authoring API for Airflow 3.
-- Keep DAG module scope free of network, database, and filesystem operations.
-- Set scheduling, catchup, retries, and execution timeouts explicitly.
-- Design tasks to tolerate retries.
-- Verify APIs against the project's pinned runtime and provider versions.
-
-## Testing and delivery
-
-- Test observable behavior, boundaries, and failure cases.
-- Use temporary storage for tests; never modify development data.
-- Mock external service boundaries, not the business logic under test.
-- Distinguish unit tests, database integration, DAG import, runtime smoke,
-  hosted CI, and AWS acceptance.
-- Reuse repository check commands in CI.
-- Never silently skip a required check because a dependency is missing.
-- Keep credentials, local paths, generated data, and runtime state out of Git.
-- Do not provision cloud resources, push, or deploy unless explicitly requested.
-- Keep documentation factual: distinguish planned from implemented and verified.
+### 4. Infrastructure & Scripting (AWS, Bash, Notebooks)
+- **Shell Scripts:** Ensure robust error handling on shell scripts (e.g., exit immediately on errors and pipe failures).
+- **Notebooks (`.ipynb`):** Maintain clear structural separation across cells (imports, configuration, core execution, validation) and avoid leaving dangling debug variables in committed notebooks.
