@@ -12,11 +12,22 @@ Run the fast quality gate:
 make check-fast
 ```
 
+Install the Git hook for this checkout:
+
+```bash
+python3 -m pre_commit install
+```
+
+Hooks check applicable staged files during commits. Whitespace hooks may modify
+files; review and stage those fixes before retrying the commit.
+The Dockerfile hook requires Docker to be running.
+
+
 The gate runs these checks in order and stops at the first failure:
 
 | Stage | Check | Purpose |
 |---|---|---|
-| Lint | Ruff | Detect selected Python errors and incorrect import ordering |
+| Lint | Ruff and SQLFluff | Check Python/Airflow rules and SQLite SQL parsing/style |
 | Formatting | Ruff format check | Verify consistent Python formatting |
 | Tests | pytest | Run unit and SQLite integration tests |
 
@@ -28,7 +39,7 @@ make format
 
 Review resulting changes before committing.
 
-## Verified behavior
+## Earlier verification
 
 On WSL with Python 3.14, Ruff 0.17.3 and pytest 9.2.0:
 
@@ -37,6 +48,18 @@ On WSL with Python 3.14, Ruff 0.17.3 and pytest 9.2.0:
   in `src/sales_lab/load.py` produced Ruff diagnostic I001.
 - Make stopped at lint with Error 2; formatting and tests did not run.
 - Restoring the import grouping returned the gate to passing.
+
+## AFL-107 verification — 2026-11-05
+
+- `make check-fast` passed Ruff, SQLFluff, Python formatting,
+  29 tests and 36 subtests.
+- An unused import caused Ruff F401 and blocked a commit; HEAD stayed unchanged.
+- File-hygiene hooks corrected whitespace/newlines and passed on rerun.
+- SQLFluff parsed SQLite UPSERT and named colon parameters.
+  SQL layout and final-newline violations were corrected; CLI and hook passed.
+- `make lint-docker` and the Hadolint hook passed using a digest-pinned image.
+  Docker is required for this separate check, but not for `make check-fast`.
+- These results establish local checks, not Gitea CI or deployment acceptance.
 
 ## Scope and limitations
 
