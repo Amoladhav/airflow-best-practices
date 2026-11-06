@@ -20,3 +20,11 @@ repos:
     rev: 4.5.0
     hooks:
       - id: sqlfluff-lint
+  - repo: local
+    hooks:
+      - id: hadolint
+        name: Hadolint Dockerfile check
+        entry: make lint-docker
+        language: system
+        files: ^Dockerfile$
+        pass_filenames: false

@@ -4,14 +4,20 @@ ENV ?= dev
 SERVICE ?= airflow-scheduler
 SQL_FILE ?=
 RUNTIME_COMPOSE = docker compose --project-name airflow-$(ENV) --env-file environments/$(ENV).env --env-file environments/.env.$(ENV).secrets -f compose.runtime.yaml
+HADOLINT_IMAGE := hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
 
 .PHONY: check-fast lint format-check test format fix airflow-init airflow-smoke airflow-inspect
 .PHONY: help runtime-check config up stop down ps logs shell db-shell db-start db-query inspect
+.PHONY: lint-docker
+
 
 check-fast:
 	$(MAKE) lint
 	$(MAKE) format-check
 	$(MAKE) test
+
+lint-docker:
+	docker run --rm -i $(HADOLINT_IMAGE) < Dockerfile
 
 lint:
 	$(PYTHON) -m ruff check .
