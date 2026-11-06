@@ -15,6 +15,7 @@ check-fast:
 
 lint:
 	$(PYTHON) -m ruff check .
+	$(PYTHON) -m sqlfluff lint src/sales_lab/sql
 
 format-check:
 	$(PYTHON) -m ruff format --check .

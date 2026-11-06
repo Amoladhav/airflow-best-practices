@@ -22,7 +22,7 @@ dev = [
     "pytest==9.2.0",
     "ruff==0.17.3",
     "pre-commit==4.7.0",
-
+    "sqlfluff==4.5.0",
 ]
 
 [tool.ruff]
