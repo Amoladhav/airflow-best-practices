@@ -53,6 +53,8 @@ class Handler(BaseHTTPRequestHandler):
         self.connection.settimeout(30)
 
     def reply(self, code: int, message: str):
+        if self.path == "/webhook":
+            LOG.info("Webhook response %s: %s", code, message)
         body = (message + "\n").encode()
         self.send_response(code)
         self.send_header("Content-Type", "text/plain")
@@ -126,6 +128,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(503, str(exc))
 
     def log_message(self, format, *args):
+        if self.path == "/healthz":
+            return
         LOG.info("HTTP %s", args[1] if len(args) > 1 else "request")
 
 

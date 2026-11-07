@@ -26,5 +26,5 @@ repos:
         name: Hadolint Dockerfile check
         entry: make lint-docker
         language: system
-        files: ^Dockerfile$
+        files: ^infra/docker/Dockerfile$
         pass_filenames: false

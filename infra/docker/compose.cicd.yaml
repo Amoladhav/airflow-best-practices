@@ -2,13 +2,13 @@ name: airflow-cicd
 
 secrets:
   runner-token:
-    file: ./.env.cicd.runner-token
+    file: ./secrets/cicd.runner-token
   deploy-runner-token:
-    file: ./.env.cicd.deploy-runner-token
+    file: ./secrets/cicd.deploy-runner-token
   cicd-api-token:
-    file: ./.env.cicd.api-token
+    file: ./secrets/cicd.api-token
   cicd-webhook-secret:
-    file: ./.env.cicd.webhook-secret
+    file: ./secrets/cicd.webhook-secret
 
 services:
   gitea:
@@ -21,7 +21,12 @@ services:
     environment:
       GITEA__database__DB_TYPE: sqlite3
       GITEA__actions__ENABLED: "true"
-      GITEA__webhook__ALLOWED_HOST_LIST: "webhook-receiver"
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      # Gitea 28 checks private IP destinations through the security egress policy.
+      GITEA__security__ALLOWED_HOST_LIST: "private:9000"
+      # Replace the legacy override persisted by earlier lab configuration.
+      GITEA__webhook__ALLOWED_HOST_LIST: "private:9000"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/healthz"]
       interval: 5s
@@ -47,12 +52,12 @@ services:
     volumes:
       - runner-data:/data
       - runner-docker:/var/lib/docker
-      - ./runner-config.yaml:/etc/gitea-runner/config.yaml:ro
+      - ./infra/docker/runner-config.yaml:/etc/gitea-runner/config.yaml:ro
 
   deploy-runner:
     build:
       context: .
-      dockerfile: Dockerfile.deploy-runner
+      dockerfile: infra/docker/Dockerfile.deploy-runner
     image: airflow-lab-deploy-runner:5.4.1
     profiles: ["deploy"]
     restart: "no"
@@ -75,8 +80,9 @@ services:
     volumes:
       - deploy-runner-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./deploy-runner-config.yaml:/etc/gitea-runner/config.yaml:ro
+      - ./infra/docker/deploy-runner-config.yaml:/etc/gitea-runner/config.yaml:ro
       - ./environments:/etc/airflow-lab/environments:ro
+      - ./secrets:/etc/airflow-lab/secrets:ro
       - release-data:/releases
 
   webhook-receiver:

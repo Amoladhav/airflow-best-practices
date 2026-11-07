@@ -3,7 +3,9 @@ name: sales-lab-afl105
 services:
   airflow-smoke:
     image: airflow-sales-lab:afl105
-    build: .
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
     environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor

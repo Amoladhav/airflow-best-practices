@@ -94,18 +94,29 @@ def validate_run(run: dict, repository: str, branch: str, revision: str) -> None
     """Require the actual server-side CI push run, never a PR-supplied result."""
     if branch not in {"dev", "main"}:
         raise GateError("Only dev and main CI can request deployment")
-    if (
-        run.get("repository", {}).get("full_name") != repository
-        or run.get("head_sha") != revision
-        or run.get("head_branch") not in {branch, f"refs/heads/{branch}"}
-        or run.get("event") != "push"
-        or run.get("path", "").split("@", 1)[0] != ".gitea/workflows/ci.yaml"
-        or run.get("conclusion") != "success"
-        or run.get("status") not in {"completed", "success"}
-    ):
-        raise GateError(
-            "Expected successful CI push run for this repository/branch/SHA"
-        )
+    expected = {
+        "repository": {repository},
+        "head_sha": {revision},
+        "head_branch": {branch, f"refs/heads/{branch}"},
+        "event": {"push"},
+        # Gitea's run API can return the workflow filename rather than its Git path.
+        "path": {"ci.yaml", ".gitea/workflows/ci.yaml"},
+        "conclusion": {"success"},
+        "status": {"completed", "success"},
+    }
+    actual = {key: run.get(key) for key in expected}
+    actual["repository"] = (run.get("repository") or {}).get("full_name")
+    actual["path"] = (run.get("path") or "").split("@", 1)[0]
+    mismatches = []
+    for field, allowed in expected.items():
+        value = actual[field]
+        if not isinstance(value, str) or value not in allowed:
+            mismatches.append(
+                f"{field}: expected {json.dumps(sorted(allowed))}, "
+                f"got {json.dumps(value, ensure_ascii=True)}"
+            )
+    if mismatches:
+        raise GateError("CI verification mismatch: " + "; ".join(mismatches))
 
 
 def from_environment() -> Gitea:

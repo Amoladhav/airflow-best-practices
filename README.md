@@ -1,58 +1,26 @@
 # Airflow CI/CD Lab
 
-A local data engineering project exploring how tested code moves through
-development, test and production environments. A small sales pipeline provides
-the workload; Gitea Actions provides the automated quality checks.
+A local Apache Airflow project demonstrating automated delivery through **dev →
+test → prod** with Gitea Actions and Docker Compose. A sales ETL pipeline provides
+the workload; the same application image is promoted across all environments.
 
-**Current milestone:** Gitea CI and workflow-driven deployment of the same image
-to dev and test are verified. Automatic triggering, branch promotion and the prod
-path are implemented; live acceptance is pending.
+## Requirements
 
-## Delivery model
+- Linux or WSL2 with Git and Make
+- Python 3.11+ for development (tested with 3.14)
+- Docker Engine or Docker Desktop with Docker Compose
 
-```text
-Feature branch → pull request → CI checks → dev → test → main (prod)
+Airflow runs in containers using Airflow 3.3.2 and Python 3.12.
+
+## Installation
+
+```bash
+git clone https://github.com/Amoladhav/airflow-best-practices.git
 ```
 
-The release process builds an image containing application code, SQL, DAGs and
-scripts. It promotes that image through isolated environments while preserving
-their data. Owners merge into dev and main; automation verifies CI, deploys dev,
-fast-forwards test, and deploys the tested artifact. See the
-[five-step setup and acceptance guide](docs/local-cicd.md).
-
-| Capability | Status |
-|---|---|
-| CSV validation and transactional SQLite UPSERT | Implemented and tested |
-| Replay, updates and rollback behavior | Verified by tests and local runtime checks |
-| Airflow dev/test/prod runtime and data isolation | Locally verified |
-| Python/Airflow, SQL, file-hygiene and Dockerfile checks | Locally verified |
-| Gitea push and pull-request CI | Verified |
-| Required-check merge enforcement | Acceptance pending |
-| Workflow-driven dev/test deployment and DAG verification | Owner verified |
-| Automatic triggering, Git promotion, prod and retained-image backout | Implemented; live acceptance pending |
-
-## Pipeline
-
-`sales_etl` is a manually triggered Airflow DAG:
-
-```text
-Sales CSV → validate records → transactional UPSERT → verify stored rows
+```bash
+cd airflow-best-practices
 ```
-
-Amounts are stored as integer cents. Invalid records or duplicate IDs within a
-batch fail validation. Replaying a batch does not duplicate sales; changed values
-update existing IDs. Records omitted from a later batch remain stored.
-
-Business logic lives in `src/sales_lab/`; orchestration lives in `dags/`.
-SQLite stores sales, while PostgreSQL stores Airflow metadata.
-
-## Run the local checks
-
-Use Python 3.11+ for development tools; the verified local environment uses Python
-3.14. Airflow runs separately in a pinned Airflow 3.3.2 / Python 3.12 image.
-Docker with Compose is required for Airflow, Gitea and the Hadolint check.
-
-From the repository root on Linux or WSL:
 
 ```bash
 python3 -m venv .venv
@@ -71,42 +39,123 @@ python3 -m pre_commit install
 ```
 
 ```bash
-make check-fast
+make check
 ```
 
-The fast gate runs Ruff, SQLFluff, Python formatting checks and unit/SQLite
-integration tests. Run the separate Dockerfile check with `make lint-docker`.
-See [quality gates](docs/quality-gates.md) for behavior and evidence limits.
+## Local platform setup
 
-## Airflow and CI platform
+Start Gitea and create its first administrator (existing accounts are preserved):
 
-Follow the [Airflow runtime guide](docs/airflow-runtime.md) to initialize images,
-environment settings, secrets and data before using `make up ENV=dev`.
-Use `make help` for inspection, logs and shutdown commands.
+```bash
+make platform-bootstrap
+```
 
-The local CI platform uses Gitea, a repository-scoped runner and a separate
-Docker-in-Docker engine. Its workflow installs development dependencies and runs
-`make check-fast` against the submitted code. It does not yet run every local hook
-or access the Airflow host. A separate trusted deployment runner manages Airflow.
-Publishing this repository to GitHub does not enable GitHub
-Actions; the workflow currently lives in `.gitea/workflows/`.
+First-time setup also requires Airflow environment files, secrets and input data, plus
+local Gitea application/control repositories and registered CI/deployment runners.
+See the [runtime guide](docs/airflow-runtime.md) and
+[CI/CD setup guide](docs/local-cicd.md) for prerequisites and configuration.
 
-Initial Gitea account/repository setup and runner-token provisioning are currently
-manual. Once configured, use `make cicd-start`, `make cicd-status` and
-`make cicd-stop`. Before stopping, prevent new workflow runs and finish or cancel
-queued/running jobs. The stop target checks job state and disables the deployment
-webhook before stopping services. Named volumes retain repositories, registration,
-release records and cached images. Airflow remains running.
+Once those prerequisites are ready, save a Gitea API token through the hidden prompt:
 
-This is a local learning environment, with lab credentials and a privileged
-Docker-in-Docker service. It is not a hardened public hosting configuration.
-Keep local secrets and runtime data out of Git.
+```bash
+python3 infra/cicd/setup.py credentials
+```
 
-## Next milestones
+Start the platform and publish its deployment controller:
 
-1. Verify protected-branch enforcement and owner-authorized integration.
-2. Accept automatic dev/test delivery and manually authorized prod promotion.
-3. Exercise two business changes, a blocked defect and retained-artifact backout.
+```bash
+make platform-start
+```
 
-See [delivery and backout design](docs/change-delivery-and-backout.md) for the
-planned contracts. AWS validation follows local delivery acceptance.
+```bash
+make platform-install
+```
+
+| Service | URL | Git branch |
+|---|---|---|
+| Gitea | http://localhost:3000 | — |
+| Airflow dev | http://localhost:8081 | `dev` |
+| Airflow test | http://localhost:8082 | `test` |
+| Airflow prod | http://localhost:8083 | `main` |
+
+Airflow endpoints become available after their environments are deployed.
+
+## Airflow login and secrets
+
+Use username `admin`. Retrieve the selected environment's password locally:
+
+```bash
+make airflow-password ENV=prod
+```
+
+Choose `dev`, `test` or `prod`. Passwords can change when API containers are
+recreated. Keep credentials out of Git and shared logs; see
+[secret management](docs/secrets.md) and [first-time Gitea setup](docs/local-cicd.md).
+
+## Usage
+
+| Task | Command |
+|---|---|
+| List commands | `make help` |
+| Run lint, format checks and tests | `make check` |
+| Format Python | `make format` |
+| Inspect prod containers | `make status ENV=prod` |
+| Open prod PostgreSQL SQL prompt | `make db-connect ENV=prod` |
+| Read prod sales data | `make sales ENV=prod` |
+| Follow scheduler logs | `make logs ENV=dev` |
+| Inspect release records | `make releases` |
+| Stop CI services; leave Airflow running | `make platform-stop` |
+
+## Architecture
+
+```mermaid
+flowchart TB
+    app["Gitea · application repository"] -->|"Push / PR"| ci["CI runner<br/>Isolated Docker engine"]
+    app -->|"CI completion webhook"| receiver["Receiver<br/>Verify signature + CI result"]
+    receiver -->|"Dispatch"| control["Private control repository"]
+    control --> deploy["Deployment runner<br/>Host Docker access"]
+    deploy --> image["Build once<br/>Image identified by source SHA and digest"]
+    image --> dev["DEV · :8081"]
+    image --> test["TEST · :8082"]
+    image --> prod["PROD · :8083"]
+    deploy --> records[("Release records")]
+    classDef runtime fill:#ECFDF5,stroke:#168365,color:#145343;
+    classDef automation fill:#EFF6FF,stroke:#2563EB,color:#183B70;
+    class dev,test,prod runtime;
+    class app,ci,receiver,control,deploy,image automation;
+```
+
+Each environment has its own input files, PostgreSQL metadata, SQLite sales data
+and logs. Application CI has no host Docker socket or deployment credentials.
+
+## Development lifecycle
+
+```mermaid
+flowchart TD
+    feature["Create feature branch<br/>Implement → make check → push"] --> pr["PR targeting dev<br/>CI checks"]
+    pr -->|"Manual review + fast-forward merge"| devci["dev push CI"]
+    devci -->|"Pass"| dev["Build image → deploy dev → verify DAG"]
+    dev -->|"Pass · automatic"| test["Fast-forward test → deploy same image → verify DAG"]
+    test --> prodpr["PR: test → main<br/>CI checks"]
+    prodpr -->|"Manual review + fast-forward merge"| mainci["main push CI"]
+    mainci -->|"Pass"| prod["Deploy tested image to prod<br/>Verify DAG · no rebuild"]
+    classDef manual fill:#FFF7ED,stroke:#C56A13,color:#7C3D0A;
+    classDef automatic fill:#EFF6FF,stroke:#2563EB,color:#183B70;
+    class feature,pr,prodpr manual;
+    class devci,dev,test,mainci,prod automatic;
+```
+
+Failed checks stop progression. `main` is the production branch; there is no
+separate `prod` branch. The `sales_etl` DAG validates CSV records, upserts sales
+into SQLite and verifies the stored rows.
+
+## Documentation
+
+- [Architecture and detailed lifecycle](docs/architecture.md)
+- [Commands and advanced operations](docs/commands.md)
+- [Setup, release verification and recovery](docs/local-cicd.md)
+- [Airflow runtime](docs/airflow-runtime.md)
+- [Quality gates](docs/quality-gates.md)
+- [Credentials and Airflow login](docs/secrets.md)
+
+This is a local learning environment. Keep credentials and runtime data out of Git.

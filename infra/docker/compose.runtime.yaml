@@ -11,6 +11,8 @@ x-airflow-common: &airflow-common
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - SALES_CSV_PATH=/opt/airflow/sample_data/sales.csv
       - APP_ENV=${APP_ENV:?APP_ENV is required}
+      - AIRFLOW__API__INSTANCE_NAME=${AIRFLOW_UI_NAME:?AIRFLOW_UI_NAME is required}
+      - AIRFLOW__API__THEME=${AIRFLOW_UI_THEME:?AIRFLOW_UI_THEME is required}
       - SALES_DB_PATH=/opt/airflow/sales-data/sales.db
       - AIRFLOW__CORE__EXECUTION_API_SERVER_URL=http://airflow-api-server:8080/execution/
       - AIRFLOW__API_AUTH__JWT_SECRET=${AIRFLOW_JWT_SECRET:?AIRFLOW_JWT_SECRET is required}

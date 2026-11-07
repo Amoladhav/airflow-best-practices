@@ -28,23 +28,24 @@ def configuration() -> dict:
 
 def secret_file(name: str, value: str) -> None:
     path = ROOT / name
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w") as stream:
         stream.write(value + "\n")
 
 
 def credentials() -> None:
-    token = ROOT / ".env.cicd.api-token"
+    token = ROOT / "secrets/cicd.api-token"
     if not token.exists():
         value = getpass.getpass(
             "Gitea API token (repository read/write scope): "
         ).strip()
         if not value:
             raise GateError("Empty token; no file written")
-        secret_file(token.name, value)
-    if not (ROOT / ".env.cicd.webhook-secret").exists():
-        secret_file(".env.cicd.webhook-secret", secrets.token_hex(32))
-    for name in (".env.cicd.api-token", ".env.cicd.webhook-secret"):
+        secret_file(str(token.relative_to(ROOT)), value)
+    if not (ROOT / "secrets/cicd.webhook-secret").exists():
+        secret_file("secrets/cicd.webhook-secret", secrets.token_hex(32))
+    for name in ("secrets/cicd.api-token", "secrets/cicd.webhook-secret"):
         path = ROOT / name
         if not path.read_text().strip():
             raise GateError(f"{name} is empty")
@@ -65,7 +66,7 @@ def hook(api: Gitea, active: bool) -> None:
             "url": HOOK_URL,
             "content_type": "json",
             "http_method": "POST",
-            "secret": (ROOT / ".env.cicd.webhook-secret").read_text().strip(),
+            "secret": (ROOT / "secrets/cicd.webhook-secret").read_text().strip(),
         },
     }
     if existing:
@@ -161,7 +162,7 @@ def main() -> None:
         config = configuration()
         api = Gitea(
             args.url,
-            (ROOT / ".env.cicd.api-token").read_text().strip(),
+            (ROOT / "secrets/cicd.api-token").read_text().strip(),
             config["APP_REPO"],
         )
         if args.action == "install":

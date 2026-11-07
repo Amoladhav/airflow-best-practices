@@ -133,6 +133,12 @@ def release(branch: str, revision: str, run_id: str, operation: str) -> None:
                             [
                                 "docker",
                                 "build",
+                                "--file",
+                                str(
+                                    Path("infra/docker/Dockerfile")
+                                    if (checkout / "infra/docker/Dockerfile").is_file()
+                                    else Path("Dockerfile")
+                                ),
                                 "--build-arg",
                                 f"SOURCE_REVISION={revision}",
                                 "--tag",

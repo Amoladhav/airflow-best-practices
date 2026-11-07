@@ -32,3 +32,12 @@ deployments/
 # Local assistant configuration
 .agents/
 .codex/
+
+# Local project planning; not public documentation
+docs/private-planning/
+/AGENTS.md
+/docs/HANDOFF.md
+/AIRFLOW_CICD_3H_CODEX_BUILD_BRIEF.md
+
+# Local credentials; never publish.
+/secrets/

@@ -14,12 +14,16 @@ esac
 
 export SALES_INPUT_DIR="${LAB_HOST_ROOT}/data/${target_env}/input"
 
+# Older verified releases retain the root-level Compose layout.
+compose_file=infra/docker/compose.runtime.yaml
+if [ ! -f "$compose_file" ]; then compose_file=compose.runtime.yaml; fi
+
 dc() {
-  docker compose \
+  docker compose --project-directory . \
     --project-name "airflow-${target_env}" \
     --env-file "/etc/airflow-lab/environments/${target_env}.env" \
-    --env-file "/etc/airflow-lab/environments/.env.${target_env}.secrets" \
-    -f compose.runtime.yaml "$@"
+    --env-file "/etc/airflow-lab/secrets/${target_env}.env" \
+    -f "$compose_file" "$@"
 }
 
 dc config --quiet

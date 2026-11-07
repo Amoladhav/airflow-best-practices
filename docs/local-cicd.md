@@ -1,95 +1,150 @@
-# Local release automation
+# Local CI/CD setup
 
-This lab uses Gitea for source control and two repository-scoped runners. The
-application runner has its own disposable Docker engine. The deployment runner
-has host Docker access and accepts jobs only from the private control repository.
-All control code is maintained here under `infra/gitea/deply-repo/` (the existing
-folder spelling is retained). `make cicd-install` publishes those files into the
-control repository; no web-editor copying is required.
+Gitea hosts the application and a private deployment-control repository. Separate
+repository-scoped runners execute application CI and trusted deployment jobs.
+Control templates live in `infra/gitea/deply-repo/`; `make platform-install`
+publishes them. GitHub is a source/publication remote, not this lab's CI engine.
 
-## Flow
+## Delivery flow
 
-```text
-Feature PR → CI → owner fast-forward merge to dev
-  → dev push CI succeeds → signed webhook → trusted deployment workflow
-  → build/reuse commit image → import check → deploy dev → scheduler/data check
-  → fast-forward test branch → deploy same image to test → scheduler/data check
-  → owner fast-forward merge test into main → main push CI succeeds
-  → deploy recorded test image to prod → scheduler/data check
+```mermaid
+flowchart TD
+    feature["Feature PR + CI"] -->|"Manual fast-forward merge"| devci["dev push CI"]
+    devci -->|"Successful signed webhook"| dev["Build image · deploy and verify dev"]
+    dev -->|"Automatic"| test["Fast-forward test · deploy and verify same image"]
+    test --> pr["test → main PR + CI"]
+    pr -->|"Manual fast-forward merge"| mainci["main push CI"]
+    mainci -->|"Successful signed webhook"| prod["Deploy verified test image to prod"]
 ```
 
-The test branch advances after dev succeeds. If the test deployment fails, its
-branch has advanced but its release is NOT verified. Prod refuses that revision.
-Test push CI runs as an additional check; it does not start another deployment.
-Prod requires both successful main CI and the matching successful test deployment.
-No process automatically merges into dev or main. Use fast-forward merges so the
-same SHA identifies the tested artifact. Do not squash or create merge commits
-for environment promotion. Protect dev/main from direct and force pushes and
-require the `CI / quality` check; verify the exact status name in your Gitea UI.
-Test must allow the automation identity to push fast-forward updates.
+These are Mermaid diagrams, rendered by GitHub's Markdown viewer. Detailed component
+and sequence diagrams are in [architecture.md](architecture.md).
 
-## Five setup and acceptance steps
+## 1. Prepare Airflow and start Gitea
 
-Existing prerequisites: Gitea and the two repository-scoped runners registered;
-application repository has dev/test/main; control repository is private with main;
-Airflow environment files, secrets and three input directories exist as described
-in [airflow-runtime.md](airflow-runtime.md). This sequence builds on those confirmed
-lab prerequisites, not on a fresh empty computer. No volumes are deleted.
+Prepare the three input directories and JWT secret files using the
+[runtime guide](airflow-runtime.md#prepare-environment-inputs-and-secrets).
+Run all commands from the repository root.
 
-1. In Gitea **user Settings → Applications**, generate a local automation API token
-   with **repository: Read and Write** (`write:repository`), no admin scope. This
-   token belongs to an identity able to read the app, fast-forward test, publish
-   the control workflow and configure the app webhook. In this single-owner lab
-   that is `cicd`. Run the hidden prompt below; never put the token in CI secrets:
+```bash
+make platform-bootstrap
+```
 
-   ```bash
-   python3 infra/cicd/setup.py credentials
-   ```
+Bootstrap configures SQLite without the browser installer. On a fresh installation,
+it prompts for a username/email and Gitea displays a generated password locally.
+Sign in at http://localhost:3000 and change that password. Repeating bootstrap
+skips account creation when an administrator already exists. Self-registration
+is disabled; administrators create additional users. The examples use owner `cicd`; if yours differs,
+update `APP_REPO` and `CONTROL_REPO` in `environments/cicd.env`.
 
-   The command stores the API token and a generated webhook signing secret in
-   ignored `.env.cicd.*` files with mode 600. It never prints either secret.
-   Adjust public repository names in `environments/cicd.env` for another owner.
+## 2. Create repositories and initialize branches
 
-2. Start/rebuild infrastructure, then install the reviewed controller and webhook:
+In Gitea create:
 
-   ```bash
-   make cicd-start
-   ```
+| Repository | Visibility | Initialization |
+|---|---|---|
+| `cicd/airflow-cicd-lab` | Private | Empty; source is pushed from this checkout |
+| `cicd/airflow-cicd-deploy` | Private | Initialize with README, default branch `main` |
 
-   ```bash
-   make cicd-install
-   ```
+Enable **Actions** in each repository's settings if it is disabled. Add the local
+application remote if this checkout does not already have it:
 
-   `cicd-install` clones the control repository into a temporary directory, commits
-   and pushes only the workflow and scripts, and creates/updates one signed
-   `workflow_run` webhook. This is an owner-run publishing operation. The receiver
-   is reachable only on the Compose network, at
-   `http://webhook-receiver:9000/webhook`; there is no host port or Docker socket.
-   Gitea's allowed webhook host is limited to `webhook-receiver`.
-   The workflow uses a local API-token file and performs its own CI verification.
+```bash
+git remote add gitea http://localhost:3000/cicd/airflow-cicd-lab.git
+```
 
-3. Run `make check-fast`, review the diff, commit these infrastructure files on
-   the feature branch and push it to Gitea. Do not stage private context, secrets,
-   `AGENTS.md`, or unrelated owner edits. Open the feature → dev PR, wait for CI,
-   and manually **fast-forward merge**. A passing dev push CI should automatically
-   start **Deployment** in the control repository. No manual dispatch is needed.
+For a **new empty application repository only**, seed all three branches from the
+committed baseline containing the CI workflow:
 
-4. Wait for Deployment success. Inspect both DAG runs and release records:
+```bash
+git -c credential.helper= push gitea HEAD:refs/heads/dev HEAD:refs/heads/test HEAD:refs/heads/main
+```
 
-   ```bash
-   make release-status
-   ```
+This bootstrap starts all branches at one revision. Subsequent changes use PRs and
+automatic promotion. Do not force-push to replace existing environment history.
+Set the application default branch to `dev` and use fast-forward-only merges.
+Protect dev/main against direct and force pushes; require the exact CI quality
+status shown by Gitea and apply protection to administrators. Permit the automation
+identity to fast-forward test. Configure protection after the initial branch seed.
 
-   Dev (`http://localhost:8081`) and test (`http://localhost:8082`) must show the
-   successful `sales_etl` run. The records must show the same source SHA and image
-   ID, and the `test` Git branch must point to that SHA. Check the test push CI too.
+## 3. Register the two runners
 
-5. Open test → main PR, wait for CI and manually **fast-forward merge**. The main
-   push CI triggers prod automatically, using the recorded image without a rebuild.
-   Verify `http://localhost:8083`, Deployment success and `make release-status`.
-   Only then is end-to-end automatic delivery accepted. Begin the two business
-   changes after that: daily reporting, then customer totals with a deliberate
-   blocked defect and recovery.
+Registration is repository-specific; do not reuse one repository's token for both.
+Open **Settings → Actions → Runners → Create new Runner** in each repository.
+Copy its registration token and save it at the appropriate hidden prompt:
+
+Application repository:
+
+```bash
+(umask 077; mkdir -p secrets; read -rsp 'Application runner token: ' runner_token; printf '\n'; test -n "$runner_token" && printf '%s' "$runner_token" > secrets/cicd.runner-token)
+```
+
+Control repository:
+
+```bash
+(umask 077; mkdir -p secrets; read -rsp 'Deployment runner token: ' runner_token; printf '\n'; test -n "$runner_token" && printf '%s' "$runner_token" > secrets/cicd.deploy-runner-token)
+```
+
+Starting the services enrolls `airflow-lab-ci` in the application repository and
+`airflow-lab-deploy` in the control repository. Registration persists in named
+volumes. The CI runner uses its isolated Docker engine; only the deployment runner
+mounts the host Docker socket. Do not register it as an instance-wide runner.
+
+## 4. Install the controller and webhook
+
+In **user Settings → Applications**, generate a personal API token with
+**Repository: Read and Write** (`write:repository`), no site-admin scope. The
+identity must be able to access both repositories, configure the app webhook,
+publish control scripts and fast-forward test. Save it locally:
+
+```bash
+python3 infra/cicd/setup.py credentials
+```
+
+```bash
+make platform-start
+```
+
+```bash
+make platform-install
+```
+
+The installer commits/pushes the reviewed controller files to the private control
+repository and creates/updates the signed CI-completion webhook. It does not
+commit or push your application worktree. **No manual workflow registration or
+web-editor copying is needed.** The deployment workflow is installed at
+`.gitea/workflows/deploy.yaml` and its scripts at repository-root `scripts/`.
+
+The receiver is internal-only at `http://webhook-receiver:9000/webhook`.
+Both Gitea security and legacy webhook allowlists include `private:9000`; the
+explicit legacy entry replaces older values retained in Gitea's configuration.
+This permits private destinations on that port, not every port or every host.
+
+The final controller reads the application using its local API token. The earlier
+manual checkout exercise used **user Settings → Actions → General → Cross-Repository
+Access**; that setting is not required for the installed controller's source fetch.
+
+## 5. Verify the initial release
+
+Confirm both runners appear **Idle** in their respective repository settings.
+Rerun application **push CI on dev** if its initial completion preceded webhook
+installation. Successful completion automatically dispatches Deployment. Wait for
+dev and test verification, then inspect:
+
+```bash
+make releases
+```
+
+For ongoing changes, open a test → main PR, wait for CI and manually fast-forward
+merge. The resulting main push CI triggers prod. On a brand-new setup where all
+branches were seeded to the same baseline, there is no merge difference: after
+test verification, explicitly rerun **main push CI** to authorize the initial prod
+release. Use the application CI run, not a PR run or an old Deployment retry.
+
+Open the Airflow UIs at ports 8081/8082/8083 and check `sales_etl` runs. Retrieve
+login passwords with `make airflow-password ENV=dev|test|prod` (choose one value);
+see [credentials](secrets.md). All verified records should identify the same source
+revision and image. Inspect business rows with `make sales ENV=prod`.
 
 ## What is checked
 
@@ -144,23 +199,12 @@ backout with a reviewed source correction/revert through the normal flow.
 Stop creating PRs/merges/pushes and finish or cancel active CI/deployment jobs first:
 
 ```bash
-make cicd-stop
+make platform-stop
 ```
 
 The command checks both repositories for queued/running jobs, disables the webhook,
 checks again, then stops receiver and runners before Gitea. It refuses to stop if
 jobs remain. Airflow stays running, and all named volumes/images are retained.
-`make cicd-start` resumes the webhook. If work arrived while the hook was disabled,
+`make platform-start` resumes the webhook. If work arrived while the hook was disabled,
 rerun the relevant CI or manually dispatch after checking its SHA; there is no
 background polling or automatic replay of events missed while stopped.
-
-## Evidence
-
-Owner verified: CI, packaged-image import, manual workflow-driven dev deployment,
-identical-image test deployment, and scheduler/data checks in both environments.
-The new receiver, branch promotion, production path and rollback have local tests;
-installation and live acceptance of those additions are still pending.
-
-References: [Gitea webhook signatures/events](https://docs.gitea.com/usage/repository/webhooks/),
-[run API](https://docs.gitea.com/api/operations/get-workflow-run/),
-[workflow dispatch](https://docs.gitea.com/api/operations/actions-dispatch-workflow/).

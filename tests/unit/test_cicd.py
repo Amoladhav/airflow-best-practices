@@ -41,9 +41,10 @@ def valid_run():
     }
 
 
-def test_valid_ci(modules):
+@pytest.mark.parametrize("path", ["ci.yaml", ".gitea/workflows/ci.yaml"])
+def test_valid_ci(modules, path):
     api, _, _ = modules
-    api.validate_run(valid_run(), "cicd/airflow-cicd-lab", "dev", SHA)
+    api.validate_run(valid_run() | {"path": path}, "cicd/airflow-cicd-lab", "dev", SHA)
 
 
 @pytest.mark.parametrize(
