@@ -40,16 +40,23 @@ See [Airflow SimpleAuthManager](https://airflow.apache.org/docs/apache-airflow/3
 | `secrets/dev.env` | Dev execution API JWT signing secret | Dev Airflow services |
 | `secrets/test.env` | Test JWT signing secret | Test Airflow services |
 | `secrets/prod.env` | Prod JWT signing secret | Prod Airflow services |
+| `secrets/gitea-admin-login.txt` | Generated first administrator login | Local owner only |
+| `secrets/setup-api-token` | Administrative API access for resumable installation | Local setup process only |
+| `secrets/setup-state.json` | Installation identity and initial source revision | Local setup process only |
 | `secrets/cicd.runner-token` | Application repository runner registration | CI runner |
 | `secrets/cicd.deploy-runner-token` | Control repository runner registration | Deployment runner |
 | `secrets/cicd.api-token` | Gitea repository API/Git access for release automation | Receiver and deployment runner |
 | `secrets/cicd.webhook-secret` | Sign/verify CI completion webhooks | Gitea webhook configuration and receiver |
 | Generated Airflow password file | Browser login for `admin` | Each API server container |
 
+Fresh installations use `make setup` to generate these files without token copying.
+The administrative setup token is never mounted into runners or the receiver.
+Only the three environment JWT files and scoped deployment credentials are mounted.
+
 The two runner tokens come from different repositories. They are not substitutes
 for the personal API token. Keep files owner-readable/writable only (`600`).
 
-`python3 infra/cicd/setup.py credentials` prompts for the API token without echoing
+For manual token replacement, `python3 infra/cicd/setup.py credentials` prompts for the API token without echoing
 it, generates the webhook secret, and preserves existing nonempty files. The API
 token needs repository read/write access for the configured app/control repositories;
 it does not need site-admin scope. Never add this token to application Actions secrets.

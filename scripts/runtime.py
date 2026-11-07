@@ -8,6 +8,14 @@ import sys
 from pathlib import Path
 
 
+def project_name(environment: str) -> str:
+    settings = Path(__file__).resolve().parents[1] / f"environments/{environment}.env"
+    for line in settings.read_text().splitlines():
+        if line.startswith("COMPOSE_PROJECT_NAME="):
+            return line.split("=", 1)[1]
+    raise RuntimeError("Missing COMPOSE_PROJECT_NAME")
+
+
 def container_id(environment: str, service: str) -> str:
     result = subprocess.run(
         [
@@ -16,7 +24,7 @@ def container_id(environment: str, service: str) -> str:
             "--all",
             "--quiet",
             "--filter",
-            f"label=com.docker.compose.project=airflow-{environment}",
+            f"label=com.docker.compose.project={project_name(environment)}",
             "--filter",
             f"label=com.docker.compose.service={service}",
             "--filter",
@@ -66,7 +74,7 @@ def compose(environment: str, arguments: list[str]) -> None:
             "--project-directory",
             str(root),
             "--project-name",
-            f"airflow-{environment}",
+            project_name(environment),
             "--env-file",
             str(root / f"environments/{environment}.env"),
             "--env-file",
@@ -106,7 +114,7 @@ def run(action: str, environment: str, service: str) -> None:
             "ps",
             "--all",
             "--filter",
-            f"label=com.docker.compose.project=airflow-{environment}",
+            f"label=com.docker.compose.project={project_name(environment)}",
             "--format",
             "table {{.Names}}\t{{.Status}}\t{{.Ports}}",
         ]

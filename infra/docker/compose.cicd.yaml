@@ -1,4 +1,4 @@
-name: airflow-cicd
+name: ${LAB_PROJECT_PREFIX:-airflow}-cicd
 
 secrets:
   runner-token:
@@ -15,7 +15,7 @@ services:
     image: docker.gitea.com/gitea:28.3.0
     restart: "no"
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${GITEA_PORT:-3000}:3000"
     volumes:
       - gitea-data:/data
     environment:
@@ -58,7 +58,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.deploy-runner
-    image: airflow-lab-deploy-runner:5.4.1
+    image: ${LAB_PROJECT_PREFIX:-airflow}-lab-deploy-runner:5.4.1
     profiles: ["deploy"]
     restart: "no"
     stop_grace_period: 60s
@@ -73,6 +73,7 @@ services:
       GITEA_RUNNER_REGISTRATION_TOKEN_FILE: /run/secrets/deploy-runner-token
       GITEA_MAX_REG_ATTEMPTS: "10"
       CONFIG_FILE: /etc/gitea-runner/config.yaml
+      LAB_PROJECT_PREFIX: "${LAB_PROJECT_PREFIX:-airflow}"
       LAB_HOST_ROOT: "${PWD:?Run Compose from the project root}"
     secrets:
       - deploy-runner-token
@@ -82,7 +83,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./infra/docker/deploy-runner-config.yaml:/etc/gitea-runner/config.yaml:ro
       - ./environments:/etc/airflow-lab/environments:ro
-      - ./secrets:/etc/airflow-lab/secrets:ro
+      - ./secrets/dev.env:/etc/airflow-lab/secrets/dev.env:ro
+      - ./secrets/test.env:/etc/airflow-lab/secrets/test.env:ro
+      - ./secrets/prod.env:/etc/airflow-lab/secrets/prod.env:ro
       - release-data:/releases
 
   webhook-receiver:

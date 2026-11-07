@@ -5,6 +5,8 @@ SERVICE ?= airflow-scheduler
 SQL_FILE ?=
 
 .DEFAULT_GOAL := check
+-include environments/platform.env
+export LAB_PROJECT_PREFIX GITEA_PORT
 CICD_COMPOSE = docker compose --project-directory . -f infra/docker/compose.cicd.yaml --profile ci --profile deploy
 RUNTIME_COMPOSE = $(PYTHON) scripts/runtime.py compose --env "$(ENV)" --
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
@@ -15,6 +17,8 @@ help:
 	  'DEVELOP' \
 	  '  make check                 Lint, format check and tests (also plain make)' \
 	  '  make format                Format Python files' \
+	  '' \
+	  '  make setup                 Fully provision a new local installation' \
 	  '' \
 	  'CI/CD PLATFORM — Gitea and runners, not the Airflow environments' \
 	  '  make platform-bootstrap    Start Gitea and create its first administrator' \
@@ -45,3 +49,7 @@ metadata: db-connect
 include make/quality.mk
 include make/platform.mk
 include make/advanced.mk
+
+.PHONY: setup
+setup:
+	$(PYTHON) infra/cicd/provision.py

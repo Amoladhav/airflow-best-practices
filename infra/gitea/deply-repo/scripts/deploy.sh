@@ -20,7 +20,7 @@ if [ ! -f "$compose_file" ]; then compose_file=compose.runtime.yaml; fi
 
 dc() {
   docker compose --project-directory . \
-    --project-name "airflow-${target_env}" \
+    --project-name "${LAB_PROJECT_PREFIX:-airflow}-${target_env}" \
     --env-file "/etc/airflow-lab/environments/${target_env}.env" \
     --env-file "/etc/airflow-lab/secrets/${target_env}.env" \
     -f "$compose_file" "$@"

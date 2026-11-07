@@ -153,7 +153,19 @@ def main() -> None:
     parser.add_argument(
         "action", choices=["credentials", "install", "resume", "pause", "status"]
     )
-    parser.add_argument("--url", default="http://localhost:3000")
+    platform = ROOT / "environments/platform.env"
+    settings = (
+        dict(
+            line.split("=", 1)
+            for line in platform.read_text().splitlines()
+            if "=" in line and not line.startswith("#")
+        )
+        if platform.exists()
+        else {}
+    )
+    parser.add_argument(
+        "--url", default="http://localhost:" + settings.get("GITEA_PORT", "3000")
+    )
     args = parser.parse_args()
     try:
         if args.action == "credentials":

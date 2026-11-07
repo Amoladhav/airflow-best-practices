@@ -7,7 +7,6 @@ environment name.** GitHub is a publication destination, not the active CI engin
 ## Platform architecture
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': 'Inter, Arial, sans-serif', 'primaryTextColor': '#172B4D', 'lineColor': '#60758A', 'clusterBkg': '#F8FAFC', 'clusterBorder': '#CBD5E1'}, 'flowchart': {'curve': 'basis'}}}%%
 flowchart TB
     developer["Developer<br/>Code · tests · pull requests"]
 
@@ -45,15 +44,6 @@ flowchart TB
     runner -->|"Compose rollout + scheduler smoke run"| environments
     secrets["Local secret files<br/>Ignored by Git"] -.-> hook
     secrets -.-> runner
-
-    classDef human fill:#FFF7ED,stroke:#C56A13,color:#7C3D0A;
-    classDef automation fill:#EFF6FF,stroke:#2563EB,color:#183B70;
-    classDef runtime fill:#ECFDF5,stroke:#168365,color:#145343;
-    classDef storage fill:#F5F3FF,stroke:#7C3AED,color:#4C2785;
-    class developer human;
-    class app,ci,hook,trusted,runner automation;
-    class dev,test,prod runtime;
-    class artifact,records,secrets storage;
 ```
 
 The app CI runner cannot access the host Docker socket or deployment credentials.
@@ -71,7 +61,6 @@ with the image.
 ## Developer and release lifecycle
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': 'Inter, Arial, sans-serif', 'primaryTextColor': '#172B4D', 'lineColor': '#60758A', 'actorBkg': '#EFF6FF', 'actorBorder': '#2563EB', 'noteBkgColor': '#FFF7ED', 'noteBorderColor': '#C56A13'}}}%%
 sequenceDiagram
     autonumber
     actor Developer
@@ -90,22 +79,22 @@ sequenceDiagram
     CI-->>Git: Successful completion
     Git->>CD: Signed workflow_run webhook
     CD->>Git: Verify CI result, workflow, branch and current SHA
-    CD->>CD: Build or reuse image; record immutable image ID
-    CD->>Runtime: Deploy DEV; verify image and sales_etl run
+    CD->>CD: Build or reuse image, record immutable image ID
+    CD->>Runtime: Deploy DEV, verify image and sales_etl run
     Runtime-->>CD: Dev verified
     CD->>Git: Fast-forward test branch to the same SHA
     Git->>CI: Test push checks (additional CI)
-    CD->>Runtime: Deploy SAME image to TEST; verify sales_etl
-    Runtime-->>CD: Test verified; retain release record
+    CD->>Runtime: Deploy SAME image to TEST, verify sales_etl
+    Runtime-->>CD: Test verified, retain release record
 
     Note over Developer,Git: MANUAL GATE 2 · test → main PR, CI and fast-forward merge
     Developer->>Git: Merge approved test PR into main
     Git->>CI: Run push CI for exact main SHA
     CI-->>Git: Successful completion
     Git->>CD: Signed workflow_run webhook
-    CD->>CD: Require matching verified test release; NO rebuild
-    CD->>Runtime: Deploy recorded image to PROD; verify sales_etl
-    Runtime-->>CD: Prod verified; record image, SHA and run ID
+    CD->>CD: Require matching verified test release, NO rebuild
+    CD->>Runtime: Deploy recorded image to PROD, verify sales_etl
+    Runtime-->>CD: Prod verified, record image, SHA and run ID
     Developer->>Runtime: Inspect UI, make sales ENV=prod, make releases
 ```
 

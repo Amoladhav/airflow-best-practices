@@ -52,6 +52,10 @@ the environment. Exit with `\q`. This connects to PostgreSQL **Airflow metadata*
 
 | Command | Use |
 |---|---|
+| `make setup` | Provision and verify a fresh installation; credentials and registration are automated |
+| `make platform-bootstrap` | Start Gitea and create its first administrator; preserve existing administrators |
+| `make image ENV=test` | Show the consistent image ID used by existing Airflow services |
+| `make ui-apply ENV=test` | Recreate only the API server with current settings and its deployed image |
 | `make platform-install` | Publish trusted controller scripts and configure webhook; owner-run setup/update |
 | `make lint`, `make format-check`, `make test` | Run individual parts of the check gate |
 | `make lint-docker` | Run the existing pinned Hadolint check on the application infra/docker/Dockerfile |
@@ -67,8 +71,8 @@ the environment. Exit with `\q`. This connects to PostgreSQL **Airflow metadata*
 
 Compose-based runtime operations resolve the image from existing Airflow containers
 and require local environment settings/secrets. Missing or inconsistent images fail
-closed; initial deployment and recovery after `down` use the CI/CD controller. They are administration
-commands, not the normal deployment path. `down` can remove container-local login
+closed; initial deployment and recovery after `down` use the CI/CD controller.
+These are administration commands, not the normal deployment path. `down` can remove container-local login
 files; prefer `stop` for routine pauses.
 
 ## Compatibility
@@ -93,6 +97,3 @@ from the daily menu. See the [runtime guide](airflow-runtime.md) for those exerc
 The root Makefile holds the menu and defaults. `make/quality.mk`,
 `make/platform.mk` and `make/advanced.mk` separate checks, CI services and
 compatibility/admin operations. `scripts/runtime.py` handles daily inspection.
-
-Use `make image ENV=test` to inspect the selected image, or
-`make ui-apply ENV=test` to recreate only the API server with updated configuration.
