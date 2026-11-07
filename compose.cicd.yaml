@@ -3,6 +3,12 @@ name: airflow-cicd
 secrets:
   runner-token:
     file: ./.env.cicd.runner-token
+  deploy-runner-token:
+    file: ./.env.cicd.deploy-runner-token
+  cicd-api-token:
+    file: ./.env.cicd.api-token
+  cicd-webhook-secret:
+    file: ./.env.cicd.webhook-secret
 
 services:
   gitea:
@@ -15,6 +21,12 @@ services:
     environment:
       GITEA__database__DB_TYPE: sqlite3
       GITEA__actions__ENABLED: "true"
+      GITEA__webhook__ALLOWED_HOST_LIST: "webhook-receiver"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   runner:
     image: gitea/runner:5.4.1-dind@sha256:8bcb489f9dd6be500de22bcaa8512ef57b81ae50315db8c7a1dc1b74978a76f4
@@ -37,10 +49,75 @@ services:
       - runner-docker:/var/lib/docker
       - ./runner-config.yaml:/etc/gitea-runner/config.yaml:ro
 
+  deploy-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.deploy-runner
+    image: airflow-lab-deploy-runner:5.4.1
+    profiles: ["deploy"]
+    restart: "no"
+    stop_grace_period: 60s
+    depends_on:
+      - gitea
+    env_file:
+      - environments/cicd.env
+    environment:
+      GITEA_INSTANCE_URL: "http://gitea:3000"
+      GITEA_RUNNER_NAME: airflow-lab-deploy
+      GITEA_RUNNER_LABELS: "airflow-deploy:host"
+      GITEA_RUNNER_REGISTRATION_TOKEN_FILE: /run/secrets/deploy-runner-token
+      GITEA_MAX_REG_ATTEMPTS: "10"
+      CONFIG_FILE: /etc/gitea-runner/config.yaml
+      LAB_HOST_ROOT: "${PWD:?Run Compose from the project root}"
+    secrets:
+      - deploy-runner-token
+      - cicd-api-token
+    volumes:
+      - deploy-runner-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./deploy-runner-config.yaml:/etc/gitea-runner/config.yaml:ro
+      - ./environments:/etc/airflow-lab/environments:ro
+      - release-data:/releases
+
+  webhook-receiver:
+    image: python:3.14-alpine
+    profiles: ["deploy"]
+    restart: "no"
+    read_only: true
+    cap_drop: ["ALL"]
+    # Read owner-only WSL secret files as container root without loosening mode 600.
+    cap_add: ["DAC_OVERRIDE"]
+    security_opt: ["no-new-privileges:true"]
+    env_file:
+      - environments/cicd.env
+    environment:
+      PYTHONPATH: /app/lib
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    command: ["python3", "/app/webhook_receiver.py"]
+    secrets:
+      - cicd-api-token
+      - cicd-webhook-secret
+    volumes:
+      - ./infra/cicd/webhook_receiver.py:/app/webhook_receiver.py:ro
+      - ./infra/gitea/deply-repo/scripts/gitea_api.py:/app/lib/gitea_api.py:ro
+      - webhook-data:/state
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   gitea-data:
     driver: local
   runner-data:
     driver: local
   runner-docker:
+    driver: local
+  deploy-runner-data:
+    driver: local
+  release-data:
+    driver: local
+  webhook-data:
     driver: local

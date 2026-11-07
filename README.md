@@ -4,8 +4,9 @@ A local data engineering project exploring how tested code moves through
 development, test and production environments. A small sales pipeline provides
 the workload; Gitea Actions provides the automated quality checks.
 
-**Current milestone:** push and pull-request CI runs pass on a local Gitea runner.
-Automated deployment, release promotion and backout are the next milestones.
+**Current milestone:** Gitea CI and workflow-driven deployment of the same image
+to dev and test are verified. Automatic triggering, branch promotion and the prod
+path are implemented; live acceptance is pending.
 
 ## Delivery model
 
@@ -13,10 +14,11 @@ Automated deployment, release promotion and backout are the next milestones.
 Feature branch → pull request → CI checks → dev → test → main (prod)
 ```
 
-The intended release process promotes the same identified artifact through each
-environment while preserving its data. Today, Airflow environments have separate
-runtime state and storage but still share workspace DAGs/scripts and an application
-image tag. Branch movement alone does not yet deploy a release.
+The release process builds an image containing application code, SQL, DAGs and
+scripts. It promotes that image through isolated environments while preserving
+their data. Owners merge into dev and main; automation verifies CI, deploys dev,
+fast-forwards test, and deploys the tested artifact. See the
+[five-step setup and acceptance guide](docs/local-cicd.md).
 
 | Capability | Status |
 |---|---|
@@ -26,7 +28,8 @@ image tag. Branch movement alone does not yet deploy a release.
 | Python/Airflow, SQL, file-hygiene and Dockerfile checks | Locally verified |
 | Gitea push and pull-request CI | Verified |
 | Required-check merge enforcement | Acceptance pending |
-| Automated deployment, promotion and backout | Planned |
+| Workflow-driven dev/test deployment and DAG verification | Owner verified |
+| Automatic triggering, Git promotion, prod and retained-image backout | Implemented; live acceptance pending |
 
 ## Pipeline
 
@@ -84,14 +87,16 @@ Use `make help` for inspection, logs and shutdown commands.
 The local CI platform uses Gitea, a repository-scoped runner and a separate
 Docker-in-Docker engine. Its workflow installs development dependencies and runs
 `make check-fast` against the submitted code. It does not yet run every local hook
-or deploy Airflow. Publishing this repository to GitHub does not enable GitHub
+or access the Airflow host. A separate trusted deployment runner manages Airflow.
+Publishing this repository to GitHub does not enable GitHub
 Actions; the workflow currently lives in `.gitea/workflows/`.
 
 Initial Gitea account/repository setup and runner-token provisioning are currently
 manual. Once configured, use `make cicd-start`, `make cicd-status` and
 `make cicd-stop`. Before stopping, prevent new workflow runs and finish or cancel
-queued/running jobs. The stop target stops services; job-state verification remains
-an operator step. Named volumes retain repository, registration and cached images.
+queued/running jobs. The stop target checks job state and disables the deployment
+webhook before stopping services. Named volumes retain repositories, registration,
+release records and cached images. Airflow remains running.
 
 This is a local learning environment, with lab credentials and a privileged
 Docker-in-Docker service. It is not a hardened public hosting configuration.
@@ -100,9 +105,8 @@ Keep local secrets and runtime data out of Git.
 ## Next milestones
 
 1. Verify protected-branch enforcement and owner-authorized integration.
-2. Build an identified release and deploy it automatically to dev.
-3. Promote that artifact through test and prod; verify runtime identity and data preservation.
-4. Exercise failed-deployment recovery and retained-artifact backout.
+2. Accept automatic dev/test delivery and manually authorized prod promotion.
+3. Exercise two business changes, a blocked defect and retained-artifact backout.
 
 See [delivery and backout design](docs/change-delivery-and-backout.md) for the
 planned contracts. AWS validation follows local delivery acceptance.

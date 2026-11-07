@@ -1,0 +1,47 @@
+name: Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Accepted application branch (dev or main)
+        required: true
+        default: dev
+        type: string
+      revision:
+        description: Full application commit SHA
+        required: true
+        type: string
+      ci_run_id:
+        description: Successful application CI push run ID (unused for rollback)
+        required: false
+        type: string
+      operation:
+        description: release or rollback (rollback requires prior prod verification)
+        required: true
+        default: release
+        type: string
+
+jobs:
+  deploy:
+    runs-on: airflow-deploy
+    timeout-minutes: 45
+    steps:
+      - name: Checkout trusted deployment controller
+        uses: builtin:checkout
+        with:
+          persist-credentials: false
+
+      - name: Verify CI and deploy accepted release
+        env:
+          RELEASE_BRANCH: ${{ inputs.branch }}
+          RELEASE_REVISION: ${{ inputs.revision }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          RELEASE_OPERATION: ${{ inputs.operation }}
+        run: |
+          set -eu
+          python3 scripts/release.py \
+            --branch "$RELEASE_BRANCH" \
+            --revision "$RELEASE_REVISION" \
+            --ci-run-id "$CI_RUN_ID" \
+            --operation "$RELEASE_OPERATION"

@@ -1,0 +1,4 @@
+FROM gitea/runner:5.4.1@sha256:a19f8dd10e66398e77429806e4fe10587cc7e9bade450f069cf5ad525d8a2b5d
+
+USER root
+RUN apk add --no-cache docker-cli docker-cli-compose docker-cli-buildx git python3

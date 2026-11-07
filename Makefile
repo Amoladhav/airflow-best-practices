@@ -5,28 +5,40 @@ SERVICE ?= airflow-scheduler
 SQL_FILE ?=
 RUNTIME_COMPOSE = docker compose --project-name airflow-$(ENV) --env-file environments/$(ENV).env --env-file environments/.env.$(ENV).secrets -f compose.runtime.yaml
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
-CICD_COMPOSE = docker compose -f compose.cicd.yaml --profile ci
+CICD_COMPOSE = docker compose -f compose.cicd.yaml --profile ci --profile deploy
 .DEFAULT_GOAL := check-fast
 
 .PHONY: check-fast lint format-check test format fix airflow-init airflow-smoke airflow-inspect
 .PHONY: help runtime-check config up stop down ps logs shell db-shell db-start db-query inspect
 .PHONY: lint-docker
-.PHONY: cicd-start cicd-status cicd-stop cicd-down
+.PHONY: cicd-start cicd-status cicd-stop cicd-down cicd-install release-status
 
 cicd-start:
 	@test -s .env.cicd.runner-token || { echo 'Missing runner token file'; exit 1; }
+	@test -s .env.cicd.deploy-runner-token || { echo 'Missing deployment runner token file'; exit 1; }
+	@test -s .env.cicd.api-token && test -s .env.cicd.webhook-secret || { echo 'Run python3 infra/cicd/setup.py credentials'; exit 1; }
 	$(CICD_COMPOSE) config --quiet
-	$(CICD_COMPOSE) up -d
+	$(CICD_COMPOSE) up -d --build --wait --wait-timeout 180
+	$(PYTHON) infra/cicd/setup.py resume
+
+cicd-install:
+	$(PYTHON) infra/cicd/setup.py install
 
 cicd-status:
 	$(CICD_COMPOSE) ps -a
+	$(PYTHON) infra/cicd/setup.py status
+
+release-status:
+	$(CICD_COMPOSE) exec -T deploy-runner sh -c 'for f in /releases/dev.json /releases/test.json /releases/prod.json /releases/*-attempt.json; do if test -f "$$f"; then echo "$$f"; cat "$$f"; fi; done'
 
 cicd-stop:
-	$(CICD_COMPOSE) stop runner
+	$(PYTHON) infra/cicd/setup.py pause
+	$(CICD_COMPOSE) stop webhook-receiver runner deploy-runner
 	$(CICD_COMPOSE) stop gitea
 	$(CICD_COMPOSE) ps -a
 
 cicd-down:
+	$(PYTHON) infra/cicd/setup.py pause
 	$(CICD_COMPOSE) down
 
 
